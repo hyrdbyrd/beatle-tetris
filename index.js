@@ -86,88 +86,68 @@ function drawMatrix(matrix, offset) {
 }
 
 function isSame(arena, x, y, c) {
-    try {
-        const color = c === null ? arena[y][x] : c;
-        if (arena[y][x] !== color)
-            return false;
-        return true;
-    } catch (error) {
-        return false;
-    }
+    return c === null || arena[y] && arena[y][x] === c;
 }
 
-function toType(arena, x, y, dirs = {y: 0, x: 0}, initialColor = null, stash = []) {
-    if (!isSame(arena, x, y, initialColor)) return stash;
+function collectBlocks(arena, x, y, dirs = {y: 0, x: 0}, initialColor = null, blocks = []) {
+    if (!isSame(arena, x, y, initialColor)) return blocks;
 
     const color = arena[y][x];
     const dirX = dirs.x === 0 ? [-1, 1] : dirs.x;
     const dirY = dirs.y === 0 ? [-1, 1] : dirs.y;
 
-    // function getStash(delta) {
-    //     const [deltaX, deltaY] = delta;
-    //     return toType(arena, x + deltaX, y + deltaY, { y: deltaY, x: deltaX }, color);
-    // }
-
     function getStash(deltaX, deltaY) {
-        return toType(arena, x + deltaX, y + deltaY, { y: deltaY, x: deltaX }, color);
+        return collectBlocks(arena, x + deltaX, y + deltaY, { y: deltaY, x: deltaX }, color);
     }
 
-    function next(...deltas) {
-        return stash.concat(deltas.map(getStash))
-    }
-
-    stash.push({ y, x, color });
+    blocks.push({ y, x, color });
 
     if (Array.isArray(dirY) && Array.isArray(dirX)) {
-        // stash = next(
-        //     [dirX[0], 0], // [0;y]
-        //     [dirX[1], 0], // [1;y]
-        //     [0, dirY[0]], // [x;0]
-        //     [0, dirY[1]]  // [x;1]
-        // )
-        stash = stash.concat(
+        blocks = blocks.concat(
             getStash(dirX[0], 0), // [0;y]
             getStash(dirX[1], 0), // [1;y]
             getStash(0, dirY[0]), // [x;0]
             getStash(0, dirY[1])  // [x;1]
         );
     } else if (Array.isArray(dirX)) {
-        stash = stash.concat(
+        blocks = blocks.concat(
             getStash(dirX[0], 0), // [0;y]
             getStash(dirX[1], 0), // [1;y]
             getStash(0, dirY)     // [x;d]
         );
     } else if (Array.isArray(dirY)) {
-        stash = stash.concat(
+        blocks = blocks.concat(
             getStash(0, dirY[0]), // [x;0]
             getStash(0, dirY[1]), // [x;1]
             getStash(dirX, 0),    // [d;y]
         );
     } else {
-        stash = stash.concat(
+        blocks = blocks.concat(
             getStash(dirX, 0),   // [d;y]
             getStash(0, dirY)    // [x;d]
         );
     }
 
-    return stash;
+    return blocks;
 }
 
 function check(arena, player) {
     arena.forEach((row, y) => {
         row.forEach((val, x) => {
-            if (val !== 0) {
-                const stash = new Set(toType(arena, x, y).filter((val) => val ? true : false));
-                if (stash.size >= 3) {
-                    player.score += stash.size * 10;
-                    console.log(player);
-                    stash.forEach(e => {
-                        arena[e.y][e.x] = 0;
-                    });
-                    toNormal(arena);
-                    check(arena, player);
-                }
-            }
+            if (!val) return;
+
+            const blocks = new Set(collectBlocks(arena, x, y));
+
+            if (blocks.size < 3) return;
+
+            player.score += blocks.size * 10;
+
+            blocks.forEach(e => {
+                arena[e.y][e.x] = 0;
+            });
+
+            toNormal(arena);
+            check(arena, player);
         })
     });
 }
