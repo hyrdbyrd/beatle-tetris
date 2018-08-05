@@ -60,8 +60,8 @@ function playerReset() {
 
 function collide(arena, player) {
     const [m, pos] = [player.matrix, player.pos];
-    for (let y = 1; y < m.length; y++)
-        for (let x = 1; x < m[y].length; x++)
+    for (let y = 0; y < m.length; y++)
+        for (let x = 0; x < m[y].length; x++)
             if (
                 m[y][x] !== 0 &&
                 (arena[y + pos.y] &&
