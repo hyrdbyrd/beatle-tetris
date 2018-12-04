@@ -1,7 +1,9 @@
-const wrapped = document.querySelector('.main');
-const canv = wrapped.querySelector('.game');
-const scoreBar = wrapped.querySelector('.score');
-const ctx = canv.getContext('2d');
+// TODO: global scope
+
+const main = document.querySelector('.main');
+const game = main.querySelector('.game');
+const scoreBar = main.querySelector('.score');
+const ctx = game.getContext('2d');
 const SCALE = 24;
 const colors = [
     null,
@@ -46,8 +48,8 @@ function createPiece () {
 function playerReset() {
     player.matrix = createPiece();
     player.pos.y = -1; // Becose NOW drop
-    player.pos.x = 
-        (arena[0].length / 2 | 0) - 
+    player.pos.x =
+        (arena[0].length / 2 | 0) -
         (player.matrix[0].length / 2 | 0) - 1;
     if (collide(arena, player)) {
         player.score = 0;
@@ -57,13 +59,13 @@ function playerReset() {
 }
 
 function collide(arena, player) {
-    const [m, o] = [player.matrix, player.pos];
-    for (let y = 0; y < m.length; ++y)
-        for (let x = 0; x < m[y].length; ++x)
+    const [m, pos] = [player.matrix, player.pos];
+    for (let y = 0; y < m.length; y++)
+        for (let x = 0; x < m[y].length; x++)
             if (
                 m[y][x] !== 0 &&
-                (arena[y + o.y] && 
-                arena[y + o.y][x + o.x]) !== 0
+                (arena[y + pos.y] &&
+                arena[y + pos.y][x + pos.x]) !== 0
             ) return true;
     return false;
 }
@@ -74,8 +76,8 @@ function drawMatrix(matrix, offset) {
             if (val !== 0) {
                 ctx.fillStyle = colors[val];
                 ctx.fillRect(
-                    x + offset.x, 
-                    y + offset.y, 
+                    x + offset.x,
+                    y + offset.y,
                     1, 1
                 );
             }
@@ -84,71 +86,75 @@ function drawMatrix(matrix, offset) {
 }
 
 function isSame(arena, x, y, c) {
-    try {
-        const color = c === null ? arena[y][x] : c;
-        if (arena[y][x] !== color)
-            return false;
-        return true;
-    } catch (error) {
-        return false;
-    }
+    return c === null || arena[y] && arena[y][x] === c;
 }
 
-function toType (arena, x, y, dirs = {'y': 0, 'x': 0}, color = null, stash = []) {
-    if (isSame(arena, x, y, color)) {
-        stash.push({ y: y, x: x, color: arena[y][x] });
-        const dirX = dirs.x === 0 ? [-1, 1] : dirs.x;
-        const dirY = dirs.y === 0 ? [-1, 1] : dirs.y;
-        const color = arena[y][x];
-        const iA = Array.isArray;
-        switch (true) {
-            case iA(dirY) && iA(dirX):
-                stash.push(...toType(arena, x + dirX[0], y, { y: 0, x: dirX[0] }, color)); // [0;y]
-                stash.push(...toType(arena, x + dirX[1], y, { y: 0, x: dirX[1] }, color)); // [1;y]
-                stash.push(...toType(arena, x, y + dirY[0], { y: dirY[0], x: 0 }, color)); // [x;0]
-                stash.push(...toType(arena, x, y + dirY[1], { y: dirY[1], x: 0 }, color)); // [x;1]
-                break;
-            case iA(dirX):
-                stash.push(...toType(arena, x + dirX[0], y, { y: 0, x: dirX[0] }, color)); // [0;y]
-                stash.push(...toType(arena, x + dirX[1], y, { y: 0, x: dirX[1] }, color)); // [1;y]
-                stash.push(...toType(arena, x, y + dirY, { y: dirY, x: 0 }, color));       // [x;d]
-                break;
-            case iA(dirY):
-                stash.push(...toType(arena, x, y + dirY[0], { y: dirY[0], x: 0 }, color)); // [x;0]
-                stash.push(...toType(arena, x, y + dirY[1], { y: dirY[1], x: 0 }, color)); // [x;1]
-                stash.push(...toType(arena, x + dirX, y, { y: 0, x: dirX }, color));       // [d;y]
-                break;
-            default:
-                stash.push(...toType(arena, x + dirX, y, { y: 0, x: dirX }, color)); // [d;y]
-                stash.push(...toType(arena, x, y + dirY, { y: dirY, x: 0 }, color)); // [x;d]
-                break;
-        }
+function collectBlocks(arena, x, y, dirs = {y: 0, x: 0}, initialColor = null, blocks = []) {
+    if (!isSame(arena, x, y, initialColor)) return blocks;
+
+    const color = arena[y][x];
+    const dirX = dirs.x === 0 ? [-1, 1] : dirs.x;
+    const dirY = dirs.y === 0 ? [-1, 1] : dirs.y;
+
+    function getStash(deltaX, deltaY) {
+        return collectBlocks(arena, x + deltaX, y + deltaY, { y: deltaY, x: deltaX }, color);
     }
-    return stash;
+
+    blocks.push({ y, x, color });
+
+    if (Array.isArray(dirY) && Array.isArray(dirX)) {
+        blocks = blocks.concat(
+            getStash(dirX[0], 0), // [0;y]
+            getStash(dirX[1], 0), // [1;y]
+            getStash(0, dirY[0]), // [x;0]
+            getStash(0, dirY[1])  // [x;1]
+        );
+    } else if (Array.isArray(dirX)) {
+        blocks = blocks.concat(
+            getStash(dirX[0], 0), // [0;y]
+            getStash(dirX[1], 0), // [1;y]
+            getStash(0, dirY)     // [x;d]
+        );
+    } else if (Array.isArray(dirY)) {
+        blocks = blocks.concat(
+            getStash(0, dirY[0]), // [x;0]
+            getStash(0, dirY[1]), // [x;1]
+            getStash(dirX, 0),    // [d;y]
+        );
+    } else {
+        blocks = blocks.concat(
+            getStash(dirX, 0),   // [d;y]
+            getStash(0, dirY)    // [x;d]
+        );
+    }
+
+    return blocks;
 }
 
 function check(arena, player) {
     arena.forEach((row, y) => {
         row.forEach((val, x) => {
-            if (val !== 0) {
-                const stash = new Set(toType(arena, x, y).filter((val) => val ? true : false));
-                if (stash.size >= 3) {
-                    player.score += stash.size * 10;
-                    console.log(player);
-                    stash.forEach(e => {
-                        arena[e.y][e.x] = 0;
-                    });
-                    toNormal(arena);
-                    check(arena, player);
-                }
-            }
+            if (!val) return;
+
+            const blocks = new Set(collectBlocks(arena, x, y));
+
+            if (blocks.size < 3) return;
+
+            player.score += blocks.size * 10;
+
+            blocks.forEach(e => {
+                arena[e.y][e.x] = 0;
+            });
+
+            toNormal(arena);
+            check(arena, player);
         })
     });
 }
 
 function draw() {
     ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, canv.width, canv.height);
+    ctx.fillRect(0, 0, game.width, game.height);
 
     drawMatrix(arena, {x: 0, y: 0})
     drawMatrix(player.matrix, player.pos);
@@ -187,16 +193,16 @@ function rotate(matrix, dir) {
     for (let y = 0; y < matrix.length; ++y) {
         for (let x = 0; x < y; ++x) {
             [
-                matrix[y][x], 
+                matrix[y][x],
                 matrix[x][y]
             ] = [
-                matrix[x][y], 
+                matrix[x][y],
                 matrix[y][x]
             ];
 
             if (dir > 0)
                 matrix.forEach(row => row.reverse())
-            else 
+            else
                 matrix.reverse();
         }
     }
